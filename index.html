@@ -3,275 +3,184 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flux Smarters</title>
+    <title>بلاير IPTV بسيط</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.15/hls.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background: #000; color: white; }
-        .page { display: none; min-height: 100vh; }
-        .page.active { display: flex; flex-direction: column; }
-        .glass { background: rgba(15, 15, 25, 0.6); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); }
-        .channel-item { transition: all 0.2s ease; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .channel-item:hover { background: rgba(99, 102, 241, 0.1); }
-        .active-channel { background: linear-gradient(90deg, #6366f1, #a855f7); }
-        .favorite-star.active { color: #fbbf24; transform: scale(1.2); }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.5); border-radius: 3px; }
-        .tab-active { background: #6366f1; color: white; font-weight: 600; }
+        body { font-family: 'Tahoma', sans-serif; background: #000; color: white; }
+        .channel:hover { background: #1e40af; }
+        .active { background: #3b82f6; font-weight: bold; }
+        #channel-list { max-height: 100vh; overflow-y: auto; }
     </style>
 </head>
-<body class="h-screen overflow-hidden">
+<body class="min-h-screen flex flex-col">
 
-    <!-- صفحة تسجيل الدخول -->
-    <div id="login-page" class="page active flex items-center justify-center">
-        <div class="glass w-full max-w-md mx-4 p-10 rounded-3xl border border-white/10 text-center">
-            <h1 class="text-4xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent mb-8">
-                Flux Smarters
-            </h1>
-            <div class="space-y-5">
-                <input type="text" id="xt-host" placeholder="السيرفر[](http://example.com:8080)" class="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 focus:outline-none focus:border-indigo-500 transition">
-                <input type="text" id="xt-user" placeholder="اسم المستخدم" class="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 focus:outline-none focus:border-indigo-500 transition">
-                <input type="password" id="xt-pass" placeholder="كلمة المرور" class="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 focus:outline-none focus:border-indigo-500 transition">
-            </div>
-            <button onclick="login()" class="mt-10 w-full bg-gradient-to-r from-indigo-600 to-purple-600 py-4 rounded-xl font-bold text-lg hover:opacity-90 transition">
-                تسجيل الدخول
+    <!-- حقل إدخال الرابط -->
+    <div class="p-4 bg-gray-900">
+        <div class="max-w-4xl mx-auto flex gap-3">
+            <input type="text" id="playlist-url" placeholder="أدخل رابط M3U أو Xtream أو get.php..." class="flex-1 px-4 py-3 rounded-lg bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button onclick="loadPlaylist()" class="bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-lg font-bold">
+                تحميل
             </button>
         </div>
+        <p id="status" class="text-center mt-3 text-sm text-gray-400"></p>
     </div>
 
-    <!-- الصفحة الرئيسية -->
-    <div id="home-page" class="page flex-col">
-        <!-- Header -->
-        <header class="p-5 glass border-b border-white/10 flex justify-between items-center">
-            <h1 class="text-2xl font-bold">Flux Smarters</h1>
-            <div class="flex gap-3">
-                <button onclick="goToPage('player-page')" class="bg-indigo-600 hover:bg-indigo-700 px-5 py-2 rounded-lg font-medium">مشغل</button>
-                <button onclick="logout()" class="bg-red-600 hover:bg-red-700 px-5 py-2 rounded-lg font-medium">خروج</button>
-            </div>
-        </header>
-
-        <!-- Tabs -->
-        <div class="flex border-b border-white/10">
-            <button onclick="switchTab('live')" id="tab-live" class="tab-active flex-1 py-4 font-medium">البث المباشر</button>
-            <button onclick="switchTab('vod')" id="tab-vod" class="flex-1 py-4 font-medium">الأفلام</button>
-            <button onclick="switchTab('series')" id="tab-series" class="flex-1 py-4 font-medium">المسلسلات</button>
-            <button onclick="switchTab('catchup')" id="tab-catchup" class="flex-1 py-4 font-medium">إعادة المشاهدة</button>
+    <div class="flex-1 flex flex-col md:flex-row">
+        <!-- قائمة القنوات -->
+        <div class="w-full md:w-96 bg-gray-900 overflow-y-auto" id="sidebar">
+            <ul id="channel-list" class="p-4 space-y-2">
+                <li class="text-center text-gray-500 py-10">
+                    أدخل رابط IPTV واضغط تحميل لعرض القنوات
+                </li>
+            </ul>
         </div>
 
-        <!-- Content Area -->
-        <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
-            <!-- Sidebar -->
-            <aside class="w-full md:w-96 glass flex flex-col border-t md:border-t-0 md:border-l border-white/10">
-                <div class="p-4 border-b border-white/10">
-                    <input type="text" id="search" placeholder="ابحث..." oninput="filterContent()" class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:border-indigo-500">
-                    <div id="categories" class="flex flex-wrap gap-2 mt-4"></div>
-                </div>
-                <ul id="content-list" class="flex-1 overflow-y-auto p-4 space-y-2">
-                    <li class="text-center text-gray-500 py-10">لا توجد عناصر</li>
-                </ul>
-            </aside>
-
-            <!-- Grid Preview -->
-            <section class="flex-1 p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 overflow-y-auto">
-                <div id="grid-preview" class="col-span-full">
-                    <!-- سيتم ملؤها تلقائيًا بصور مصغرة أو قنوات -->
-                </div>
-            </section>
-        </div>
-    </div>
-
-    <!-- صفحة المشغل -->
-    <div id="player-page" class="page flex-col">
-        <header class="p-5 glass border-b border-white/10 flex justify-between items-center">
-            <button onclick="goToPage('home-page')" class="text-2xl">←</button>
-            <h2 id="player-title" class="text-xl font-bold">مشغل البث</h2>
-            <button onclick="toggleMultiScreen()" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg">Multi</button>
-        </header>
-
-        <div class="flex-1 relative bg-black">
-            <video id="main-video" class="w-full h-full" controls autoplay playsinline></video>
-
-            <div id="multi-grid" class="absolute inset-0 grid grid-cols-2 hidden">
-                <!-- سيتم إضافة الشاشات هنا ديناميكيًا -->
-            </div>
-
-            <div id="player-loading" class="absolute inset-0 flex items-center justify-center bg-black/80 hidden">
+        <!-- المشغل -->
+        <div class="flex-1 bg-black relative">
+            <video id="video" class="w-full h-full" controls autoplay></video>
+            <div id="loading" class="absolute inset-0 flex items-center justify-center bg-black/70 hidden">
                 <div class="text-center">
-                    <div class="w-16 h-16 border-4 border-t-indigo-500 rounded-full animate-spin mb-4"></div>
+                    <div class="w-16 h-16 border-4 border-t-blue-500 border-white rounded-full animate-spin mb-4"></div>
                     <p>جاري التحميل...</p>
                 </div>
             </div>
         </div>
-
-        <div class="p-5 glass border-t border-white/10">
-            <h3 id="current-name" class="text-lg font-bold">اختر قناة</h3>
-            <p id="current-url" class="text-sm text-gray-400 truncate"></p>
-        </div>
     </div>
 
     <script>
-        // البيانات العامة
-        let allContent = { live: [], vod: [], series: [], catchup: [] };
-        let currentTab = 'live';
-        let currentChannels = [];
-        let favorites = new Set(JSON.parse(localStorage.getItem('flux_favorites') || '[]'));
-        let hlsInstances = [];
-        let currentStream = null;
+        let channels = [];
+        let hls = null;
 
-        // التنقل بين الصفحات
-        function goToPage(pageId) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById(pageId).classList.add('active');
-        }
+        async function loadPlaylist() {
+            const urlInput = document.getElementById('playlist-url').value.trim();
+            const status = document.getElementById('status');
+            const loading = document.getElementById('loading');
+            const channelList = document.getElementById('channel-list');
 
-        // تسجيل الدخول
-        async function login() {
-            const host = document.getElementById('xt-host').value.trim();
-            const user = document.getElementById('xt-user').value.trim();
-            const pass = document.getElementById('xt-pass').value.trim();
+            if (!urlInput) {
+                status.textContent = 'أدخل رابط أولاً';
+                status.style.color = 'red';
+                return;
+            }
 
-            if (!host || !user || !pass) return alert('املأ جميع الحقول');
+            status.textContent = 'جاري تحميل القائمة...';
+            status.style.color = 'yellow';
+            channelList.innerHTML = '<li class="text-center py-10">جاري التحميل...</li>';
 
-            localStorage.setItem('flux_credentials', JSON.stringify({host, user, pass}));
+            let fetchUrl = urlInput;
+
+            // إذا كان رابط عادي (M3U أو get.php)، استخدم proxy لتجنب CORS
+            if (!urlInput.includes('player_api.php')) {
+                fetchUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(urlInput);
+            }
 
             try {
-                const live = await fetch(`${host}/player_api.php?username=${user}&password=${pass}&action=get_live_streams`).then(r => r.json());
-                const vod = await fetch(`${host}/player_api.php?username=${user}&password=${pass}&action=get_vod_streams`).then(r => r.ok ? r.json() : []);
-                const series = await fetch(`${host}/player_api.php?username=${user}&password=${pass}&action=get_series`).then(r => r.ok ? r.json() : []);
+                const response = await fetch(fetchUrl);
+                if (!response.ok) throw new Error('فشل التحميل');
 
-                allContent.live = live.map(c => ({...c, type: 'live', url: `${host}/live/${user}/${pass}/${c.stream_id}.m3u8`}));
-                allContent.vod = vod.map(c => ({...c, type: 'vod', url: `${host}/movie/${user}/${pass}/${c.stream_id}.m3u8`}));
-                allContent.series = series.map(c => ({...c, type: 'series'}));
-                allContent.catchup = allContent.live.slice(0, 20); // محاكاة
+                const text = await response.text();
 
-                localStorage.setItem('flux_content', JSON.stringify(allContent));
+                if (text.includes('#EXTINF')) {
+                    // رابط M3U
+                    channels = parseM3U(text);
+                } else if (text.includes('"stream_id"') || text.includes('["user_info"]')) {
+                    // Xtream API (تحويل JSON إلى قنوات)
+                    const data = JSON.parse(text);
+                    if (data.length > 0) {
+                        const base = urlInput.split('/player_api.php')[0];
+                        const params = new URLSearchParams(urlInput.split('?')[1]);
+                        const user = params.get('username');
+                        const pass = params.get('password');
+                        channels = data.map(ch => ({
+                            name: ch.name,
+                            url: `${base}/live/${user}/${pass}/${ch.stream_id}.m3u8`
+                        }));
+                    } else {
+                        channels = [];
+                    }
+                } else {
+                    throw new Error('رابط غير مدعوم');
+                }
 
-                currentChannels = allContent.live;
-                renderCategories();
-                renderGrid();
-                goToPage('home-page');
+                if (channels.length === 0) {
+                    channelList.innerHTML = '<li class="text-center text-gray-400 py-10">لا توجد قنوات في هذا الرابط</li>';
+                    status.textContent = 'تم التحميل لكن لا توجد قنوات';
+                    status.style.color = 'orange';
+                    return;
+                }
+
+                renderChannels();
+                status.textContent = `تم تحميل ${channels.length} قناة بنجاح`;
+                status.style.color = 'lime';
             } catch (e) {
-                alert('فشل الاتصال أو بيانات غير صحيحة');
+                channelList.innerHTML = '<li class="text-center text-red-400 py-10">فشل تحميل الرابط<br>جرب رابط آخر</li>';
+                status.textContent = 'خطأ: الرابط غير صحيح أو السيرفر لا يستجيب';
+                status.style.color = 'red';
             }
         }
 
-        // الخروج
-        function logout() {
-            localStorage.clear();
-            location.reload();
+        function parseM3U(text) {
+            const lines = text.split('\n');
+            const list = [];
+            let current = null;
+
+            for (let line of lines) {
+                line = line.trim();
+                if (line.startsWith('#EXTINF:')) {
+                    const name = line.split(',').pop().trim();
+                    current = { name };
+                } else if (line.startsWith('http') && current) {
+                    current.url = line;
+                    list.push(current);
+                    current = null;
+                }
+            }
+            return list;
         }
 
-        // تبديل التبويبات
-        function switchTab(tab) {
-            currentTab = tab;
-            currentChannels = allContent[tab];
-            document.querySelectorAll('[id^="tab-"]').forEach(b => b.classList.remove('tab-active'));
-            document.getElementById(`tab-${tab}`).classList.add('tab-active');
-            renderCategories();
-            renderGrid();
-        }
-
-        // عرض التصنيفات
-        function renderCategories() {
-            const categoriesDiv = document.getElementById('categories');
-            const groups = ['الكل', 'المفضلة ⭐', ...new Set(currentChannels.map(c => c.category_name || 'غير مصنفة'))];
-            categoriesDiv.innerHTML = groups.map(g => {
-                const count = g === 'المفضلة ⭐' ? favorites.size : 
-                              g === 'الكل' ? currentChannels.length :
-                              currentChannels.filter(c => (c.category_name || 'غير مصنفة') === g).length;
-                return `<button onclick="filterByCategory('${g}')" class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm">${g} (${count})</button>`;
-            }).join('');
-        }
-
-        function filterByCategory(cat) {
-            let filtered = currentChannels;
-            if (cat === 'المفضلة ⭐') filtered = currentChannels.filter(c => favorites.has(c.url));
-            else if (cat !== 'الكل') filtered = currentChannels.filter(c => (c.category_name || 'غير مصنفة') === cat);
-            renderGrid(filtered);
-        }
-
-        function filterContent() {
-            const term = document.getElementById('search').value.toLowerCase();
-            const filtered = currentChannels.filter(c => c.name.toLowerCase().includes(term));
-            renderGrid(filtered);
-        }
-
-        // عرض الشبكة
-        function renderGrid(list = currentChannels) {
-            const grid = document.getElementById('grid-preview');
-            grid.innerHTML = list.map(item => `
-                <div onclick="playInMain('${item.url}', '${item.name}')" class="cursor-pointer group">
-                    <div class="bg-gray-800 rounded-xl aspect-video flex items-center justify-center text-4xl font-bold group-hover:ring-4 ring-indigo-500 transition">
-                        ${item.stream_icon ? `<img src="${item.stream_icon}" class="w-full h-full object-cover rounded-xl">` : item.name.charAt(0)}
-                    </div>
-                    <p class="mt-3 text-sm font-medium truncate">${item.name}</p>
-                    <p class="text-xs text-gray-400">${item.category_name || ''}</p>
-                </div>
+        function renderChannels() {
+            const list = document.getElementById('channel-list');
+            list.innerHTML = channels.map((ch, i) => `
+                <li class="channel p-3 rounded-lg cursor-pointer flex items-center gap-3" onclick="playChannel('${ch.url}', '${ch.name}')">
+                    <span class="text-blue-400 font-bold">${i+1}</span>
+                    <span class="truncate">${ch.name}</span>
+                </li>
             `).join('');
         }
 
-        // تشغيل في المشغل الرئيسي
-        function playInMain(url, name) {
-            currentStream = {url, name};
-            document.getElementById('current-name').innerText = name;
-            document.getElementById('current-url').innerText = url;
-            goToPage('player-page');
-            loadHLS('main-video', url);
-        }
-
-        // تحميل HLS
-        function loadHLS(videoId, url) {
-            const video = document.getElementById(videoId);
-            const loading = document.getElementById('player-loading');
+        function playChannel(url, name) {
+            const video = document.getElementById('video');
+            const loading = document.getElementById('loading');
             loading.classList.remove('hidden');
 
-            if (hlsInstances[videoId]) hlsInstances[videoId].destroy();
+            document.querySelectorAll('.channel').forEach(el => el.classList.remove('active'));
+            event.target.closest('.channel').classList.add('active');
+
+            if (hls) hls.destroy();
 
             if (Hls.isSupported()) {
-                const hls = new Hls({ lowLatencyMode: true });
+                hls = new Hls();
                 hls.loadSource(url);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     video.play();
                     loading.classList.add('hidden');
                 });
-                hlsInstances[videoId] = hls;
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = url;
                 video.play();
                 loading.classList.add('hidden');
+            } else {
+                loading.classList.add('hidden');
+                alert('المتصفح لا يدعم تشغيل هذا البث');
             }
         }
 
-        // Multi-Screen
-        function toggleMultiScreen() {
-            const grid = document.getElementById('multi-grid');
-            grid.classList.toggle('hidden');
-            document.getElementById('main-video').classList.toggle('hidden');
-            if (!grid.classList.contains('hidden') && grid.innerHTML === '') {
-                for (let i = 1; i <= 4; i++) {
-                    grid.innerHTML += `
-                        <div class="relative">
-                            <video id="multi-${i}" class="w-full h-full bg-black" controls></video>
-                            <button onclick="this.parentElement.remove()" class="absolute top-2 right-2 bg-red-600 p-2 rounded">×</button>
-                        </div>`;
-                }
-            }
-        }
-
-        // تحميل البيانات عند البداية
-        window.onload = () => {
-            const creds = localStorage.getItem('flux_credentials');
-            const content = localStorage.getItem('flux_content');
-            if (creds && content) {
-                allContent = JSON.parse(content);
-                currentChannels = allContent.live;
-                renderCategories();
-                renderGrid();
-                goToPage('home-page');
-            }
-        };
+        // دعم Enter في الحقل
+        document.getElementById('playlist-url').addEventListener('keypress', e => {
+            if (e.key === 'Enter') loadPlaylist();
+        });
     </script>
 </body>
 </html>
